@@ -44,8 +44,8 @@ celdas vacías en el CSV.
 1. Clona este repositorio:
 
 ```
-git clone https://github.com/diegovc20/nombre-del-repo.git
-cd nombre-del-repo
+git clone https://github.com/diegovc20/Web-Scraping-con-Selenium-BeautifulSoup-y-Pandas---Amazon.git
+cd Web-Scraping-con-Selenium-BeautifulSoup-y-Pandas---Amazon
 ```
 
 2. (Opcional pero recomendado) Crea un entorno virtual:
@@ -69,7 +69,7 @@ se gestiona automáticamente.
 Desde la terminal, dentro de la carpeta del proyecto:
 
 ```
-python webscrapping_amazon.py
+python WebScrapping_df.py
 ```
 
 El script te va a preguntar dos cosas directamente en la terminal:
