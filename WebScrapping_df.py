@@ -1,0 +1,123 @@
+
+
+# Nombre: Diego Valle Cuevas
+# Grupo: 952
+# fecha: 13/09/2026
+# Meta 1.4 Analizar y Comprender Proceso de Extracción de Datos. Web Scraping con Selenium + BeautifulSoup + Pandas (Amazon Mexico)
+
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
+import pandas as pd
+import time
+
+
+# Definimos la función que recibe el producto a buscar y cuantas paginas visitar
+def buscar_producto(producto, num_paginas):
+
+    # Colocamos las configuraciones de la visualización del navegador
+    opc = Options()
+    opc.add_argument("--window-size=1920,1080")
+    # Este user-agent es para que Amazon piense que somos un Chrome normal y no un bot
+    opc.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                     "AppleWebKit/537.36 (KHTML, like Gecko) "
+                     "Chrome/126.0.0.0 Safari/537.36")
+    navegador = webdriver.Chrome(options=opc)
+
+    # Creamos el diccionario donde vamos a ir guardando los datos.Cada llave va a ser una columna del DataFrame al final.
+    data = {"pagina": [], "nombre": [], "precio": [], "rating": [], "entrega": []}
+
+    try:
+        # Recorremos las paginas que nos pidieron
+        for pagina in range(1, num_paginas + 1):
+
+            # Armamos la url de busqueda. La k es lo que buscamos y page el numero de pagina.
+            # Cambiamos los espacios por + porque las urls no llevan espacios.
+            busqueda = producto.replace(" ", "+")
+            navegador.get(f"https://www.amazon.com.mx/s?k={busqueda}&page={pagina}")
+
+            # Esperamos a que cargue toda la pagina antes de leer el html
+            time.sleep(5)
+
+            # Aqui es donde Selenium le pasa el html a BeautifulSoup.
+            # page_source nos da todo el html que ya cargo el navegador.
+            html = navegador.page_source
+            soup = BeautifulSoup(html, "html.parser")
+
+            # Buscamos todas las tarjetas de producto de la pagina.
+            # Usamos el data-component-type porque las clases de Amazon cambian mucho.
+            tarjetas = soup.find_all("div", attrs={"data-component-type": "s-search-result"})
+            print(f"Pagina {pagina}: se encontraron {len(tarjetas)} productos")
+
+            # Si no encontro nada es que no cargo o nos bloquearon, rompemos el ciclo
+            if len(tarjetas) == 0:
+                print("No se encontraron productos, se detiene la busqueda")
+                break
+
+            # Ahora recorremos cada tarjeta y sacamos los datos de adentro de esa tarjeta.
+            # Si buscaramos los precios en toda la pagina no sabriamos de quien es cada uno.
+            for item in tarjetas:
+
+                nombre = item.find("h2")
+                # El a-offscreen es un span escondido que trae el precio completo ($209.00)
+                precio = item.find("span", class_="a-offscreen")
+                # El rating viene como texto, ejemplo: "4.6 de 5 estrellas"
+                rating = item.find("span", class_="a-icon-alt")
+                entrega = item.find("div", class_="udm-primary-delivery-message")
+
+                # Si la tarjeta no trae ni nombre es que no es un producto (banner o anuncio),
+                # entonces mejor ni la guardamos
+                if nombre:
+                    data["pagina"].append(pagina)
+                    data["nombre"].append(nombre.text)
+                else:
+                    continue
+
+                # Aqui validamos los datos faltantes. Si el elemento existe guardamos su texto,
+                # y si no existe guardamos un valor por default para que no quede vacio.
+                if precio:
+                    data["precio"].append(precio.text)
+                else:
+                    data["precio"].append("Sin precio")
+
+                if rating:
+                    data["rating"].append(rating.text)
+                else:
+                    data["rating"].append("Sin calificacion")
+
+                if entrega:
+                    data["entrega"].append(entrega.text)
+                else:
+                    data["entrega"].append("Sin fecha de entrega")
+
+    # Si algo llega a fallar o modificaron el html, avisamos en vez de que truene feo
+    except Exception as e:
+        print(f"Ocurrio un error: {e}")
+
+    # Establecemos al final, si o si el navegador tiene que cerrar
+    finally:
+        navegador.quit()
+
+    # Ya que terminamos de recolectar todo, convertimos el diccionario en un DataFrame.
+    # Cada llave se vuelve una columna y cada posicion de la lista una fila.
+    df = pd.DataFrame(data)
+
+    # Guardamos el csv. El index=False es para que no nos ponga una columna extra
+    # con los numeros 0,1,2,3. El utf-8-sig es para que Excel no rompa los acentos.
+    df.to_csv(f"amazon_{busqueda}.csv", index=False, encoding="utf-8-sig")
+
+    print(f"Total de productos recolectados: {len(df)}")
+    print(df)
+
+    # La función tiene que regresar el DataFrame
+    return df
+
+
+# Ahora si mandamos a llamar la función y los parametros a buscar en la web
+if __name__ == "__main__":
+    producto_input = input("¿Qué producto quieres buscar? ")
+    paginas_input = int(input("¿Cuántas páginas quieres visitar (en números)? "))
+
+    df_resultado = buscar_producto(producto_input, paginas_input)
